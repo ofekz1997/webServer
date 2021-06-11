@@ -55,8 +55,8 @@ typedef struct List_t* List;
 struct Request_t
 {
     int fd;
-    double arrival;
-    double dispatch;
+    struct timeval arrival;
+    struct timeval pickup;
 };
 typedef struct Request_t* Request;
 
@@ -91,7 +91,7 @@ void listDestroy(List list);
 * 	an element failed)
 * 	LIST_SUCCESS if the element had been inserted successfully
 */
-ListResult listAdd(List list, int fd, double arrival);
+ListResult listAdd(List list, int fd, struct timeval arrival);
 
 /**
 *	listEnque: add a node with the specified data to the list, a copy of the data will be added
@@ -104,7 +104,7 @@ ListResult listAdd(List list, int fd, double arrival);
 * 	an element failed)
 * 	LIST_SUCCESS if the element had been inserted successfully
 */
-ListResult listEnqueue(List list, int fd, double arrival);
+ListResult listEnqueue(List list, int fd, struct timeval arrival);
 
 
 
@@ -174,7 +174,7 @@ int listGet(Node node);
 int listDrop(List list, double percent);
 
 
-double Time_GetMilliSeconds();
+struct timeval Time_GetTimeval();
 
 
 #endif

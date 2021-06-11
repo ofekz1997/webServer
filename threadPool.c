@@ -9,8 +9,10 @@ typedef struct ThreadStat_t
     int total_count;
     int static_req;
     int dynamic_req;
+    ThreadPool pool; 
 } ThreadStat;
  
+
 struct Pool_t
 {
     size_t poolSize;
@@ -25,44 +27,59 @@ struct Pool_t
     pthread_cond_t condBlock;
 };
 
-
-typedef struct HandleRequest_struct
+static char *fillBufferHdr(ThreadStat *stat, Request req)
 {
-    struct Pool_t *pool;
-    ThreadStat *threadStat;
+    char *buf = malloc(MAXBUF);
 
-} *HandleRequest_struct;
-
-static void* HandleRequest(void *data)
-{
-    HandleRequest_struct cur_st  = (HandleRequest_struct)data;
-    ThreadPool cur_pool = cur_st->pool;
-    ThreadStat *st =  cur_st->threadStat;
-    Request req = NULL;
-    while(true)
+    sprintf(buf, "Stat-Req-Arrival:: %lu.%06lu\r\n", req->arrival.tv_sec, req->arrival.tv_usec);
+    if(req->pickup.tv_usec  < req->arrival.tv_usec)
     {
-        pthread_mutex_lock(&(cur_pool->mutex));
-            while (listGetSize(cur_pool->waitingRequests) == 0) 
-            {
-                pthread_cond_wait(&(cur_pool->condCanDequeue), &(cur_pool->mutex));
-            }
-            req = listDequeue(cur_pool->waitingRequests);
-        pthread_mutex_unlock(&(cur_pool->mutex));
+        sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, 
+            req->pickup.tv_sec - req->arrival.tv_sec-1, 1000000+ req->pickup.tv_usec - req->arrival.tv_usec);
+    }
+    else
+    {
+        sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, 
+            req->pickup.tv_sec - req->arrival.tv_sec, req->pickup.tv_usec - req->arrival.tv_usec);
+    }
+    
 
-        requestHandle(req->fd); //TODO change requestHandle, need to update ThreadStat and change print.
-        printf("finish job\n");
+    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, stat->id);
+    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, stat->total_count);
+    return buf;
+}
 
-        pthread_mutex_lock(&(cur_pool->mutex));
-            --cur_pool->TotalRequests;
-            pthread_cond_signal(&(cur_pool->condBlock));
-        pthread_mutex_unlock(&(cur_pool->mutex));
+static void *HandleRequest(void *data)
+{
+    ThreadStat *thread = (ThreadStat *)data;
+    ThreadPool pool = thread->pool;
+    Request req = NULL;
+    while (true)
+    {
+        pthread_mutex_lock(&(pool->mutex));
+        while (listGetSize(pool->waitingRequests) == 0)
+        {
+            pthread_cond_wait(&(pool->condCanDequeue), &(pool->mutex));
+        }
+        req = listDequeue(pool->waitingRequests);
+        pthread_mutex_unlock(&(pool->mutex));
+
+        thread->total_count++;
+        char *buf = fillBufferHdr(thread, req);
+
+        requestHandle(req->fd, buf, &thread->static_req, &thread->dynamic_req); 
+        
+        free(buf);
+
+        pthread_mutex_lock(&(pool->mutex));
+        --(pool->TotalRequests);
+        pthread_cond_signal(&(pool->condBlock));
+        pthread_mutex_unlock(&(pool->mutex));
 
         Close(req->fd);
-        
     }
     return NULL;
 }
-
 
 ThreadPool ThreadPoolCreate(size_t poolSize, size_t maxRequest, SchedAlg schedAlg, pthread_t mainThreadID)
 {
@@ -90,10 +107,9 @@ ThreadPool ThreadPoolCreate(size_t poolSize, size_t maxRequest, SchedAlg schedAl
         new_pool->threadArray[i].dynamic_req = 0;
         new_pool->threadArray[i].static_req = 0;
         new_pool->threadArray[i].total_count = 0;
-        HandleRequest_struct st = malloc(sizeof(*st));
-        st->threadStat = &(new_pool->threadArray[i]);
-        st->pool = new_pool;
-        pthread_create(&(new_pool->threadArray[i].thread), NULL, HandleRequest, st);
+        new_pool->threadArray[i].pool = new_pool;
+
+        pthread_create(&(new_pool->threadArray[i].thread), NULL, HandleRequest, &(new_pool->threadArray[i]));
     }
 
 
@@ -116,7 +132,7 @@ void ThreadPoolDestroy(ThreadPool pool)
     free(pool);
 }
 
-void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
+void ThreadPoolAddRequest(ThreadPool pool, int fd, struct timeval arrival)
 {
     if(pool->TotalRequests >= pool->maxRequest)
     {
@@ -124,13 +140,11 @@ void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
         {
         case DROP_TAIL:
         {
-            printf("in DROP_TAIL\n");
             Close(fd);
             break;
         }
         case DROP_HEAD:
         {
-            printf("in DROP_HEAD\n");
             if(listGetSize(pool->waitingRequests) == 0)
             {
                 Close(fd);
@@ -148,7 +162,6 @@ void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
         }
         case BLOCK:
         {
-            printf("in BLOCK\n");
 
             pthread_mutex_lock(&(pool->mutex));
                 while (pool->TotalRequests >= pool->maxRequest) 
@@ -157,12 +170,10 @@ void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
                 }
 
                 listEnqueue(pool->waitingRequests,fd, arrival);
-                printf("insert\n");
                 ++pool->TotalRequests;
                 pthread_cond_signal(&(pool->condCanDequeue));
             pthread_mutex_unlock(&(pool->mutex));
 
-            printf("out BLOCK\n");
             break;
         } 
         case RANDOM_DROP:
@@ -170,7 +181,6 @@ void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
             pthread_mutex_lock(&(pool->mutex));
                 pool->TotalRequests -= listDrop(pool->waitingRequests,0.25);
                 listEnqueue(pool->waitingRequests,fd, arrival);
-                printf("insert\n");
                 ++pool->TotalRequests;
             pthread_mutex_unlock(&(pool->mutex));
             break;
@@ -186,6 +196,5 @@ void ThreadPoolAddRequest(ThreadPool pool, int fd, double arrival)
             ++pool->TotalRequests;
             pthread_cond_signal(&(pool->condCanDequeue));
         pthread_mutex_unlock(&(pool->mutex));
-        printf("insert\n");
     }
 }

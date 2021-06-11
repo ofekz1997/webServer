@@ -44,16 +44,17 @@ int main(int argc, char *argv[])
     SchedAlg schedAlg = RANDOM_DROP;
     struct sockaddr_in clientaddr;
 
-  //  getargs(&port, &poolSize, &maxRequests, &schedAlg, argc, argv);
+    getargs(&port, &poolSize, &maxRequests, &schedAlg, argc, argv);
     ThreadPool pool = ThreadPoolCreate(poolSize, maxRequests, schedAlg, pthread_self());
 
     listenfd = Open_listenfd(port);
 
+    srand(time(NULL));
     while (1)
     {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *)&clientlen);
-        ThreadPoolAddRequest(pool, connfd, Time_GetMilliSeconds());
+        ThreadPoolAddRequest(pool, connfd, Time_GetTimeval());
     }
 
     ThreadPoolDestroy(pool);

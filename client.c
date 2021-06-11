@@ -48,15 +48,13 @@ void clientPrint(int fd)
   char buf[MAXBUF];  
   int length = 0;
   int n;
-  printf("fd: %d\n",fd);
+  
   Rio_readinitb(&rio, fd);
 
   /* Read and display the HTTP Header */
   n = Rio_readlineb(&rio, buf, MAXBUF);
-  printf("n: %d\n",n);
-
   while (strcmp(buf, "\r\n") && (n > 0)) {
-    printf("Header:s %s", buf);
+    printf("Header: %s", buf);
     n = Rio_readlineb(&rio, buf, MAXBUF);
 
     /* If you want to look for certain HTTP tags... */
@@ -75,20 +73,18 @@ void clientPrint(int fd)
 
 int main(int argc, char *argv[])
 {
-  char *host, *filename ;
+  char *host, *filename;
   int port;
   int clientfd;
 
-
-
-if (argc != 4) {
+  if (argc != 4) {
     fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
     exit(1);
   }
+
   host = argv[1];
   port = atoi(argv[2]);
   filename = argv[3];
-  
 
   /* Open a single connection to the specified host and port */
   clientfd = Open_clientfd(host, port);

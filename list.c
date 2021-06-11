@@ -146,7 +146,7 @@ void listDestroy(List list)
     }
 }
 
-ListResult listAdd(List list, int fd, double arrival)
+ListResult listAdd(List list, int fd, struct timeval arrival)
 {
     if (list == NULL)
     {
@@ -182,7 +182,7 @@ ListResult listAdd(List list, int fd, double arrival)
     return LIST_SUCCESS;
 }
 
-ListResult listEnqueue(List list, int fd, double arrival)
+ListResult listEnqueue(List list, int fd, struct timeval arrival)
 {
     return listAdd(list, fd ,arrival);
 }
@@ -267,7 +267,7 @@ Request listDequeue(List list)
         list->head = NULL;
     }
     res = node->data;
-    res->dispatch = Time_GetMilliSeconds() - res->arrival;
+    res->pickup = Time_GetTimeval();
     (list->size)--;
     free(node);
 
@@ -359,12 +359,11 @@ int listDrop(List list, double percent)
 
     free(fdsToDrop);
     free(dropped);
-    printf("close: %d\n",count);
     return count;
 }
 
-double Time_GetMilliSeconds() {
+struct timeval Time_GetTimeval() {
     struct timeval t;
     int rc = gettimeofday(&t, NULL);
-    return (double) ((double)t.tv_sec*1000 + (double)t.tv_usec / 1000);
+    return t;
 }
