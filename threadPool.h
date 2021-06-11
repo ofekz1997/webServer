@@ -15,9 +15,11 @@ typedef enum SchedAlg_t {
     RANDOM_DROP
 } SchedAlg;
 
-ThreadPool ThreadPoolCreate(size_t poolSize, size_t maxRequest, SchedAlg schedAlg);
+
+
+ThreadPool ThreadPoolCreate(size_t poolSize, size_t maxRequest, SchedAlg schedAlg, pthread_t mainThreadID);
 void ThreadPoolDestroy(ThreadPool pool);
-void ThreadPoolAddRequest(ThreadPool pool,int fd);
+void ThreadPoolAddRequest(ThreadPool pool,int fd, double arrival);
 
 
 #endif // THREADS_POOL_H_

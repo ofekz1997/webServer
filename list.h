@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "bool.h"
+#include "segel.h"
 
 /**
 * List Container
@@ -51,6 +52,15 @@ typedef enum ListResult_t {
 typedef struct Node_t* Node;
 typedef struct List_t* List;
 
+struct Request_t
+{
+    int fd;
+    double arrival;
+    double dispatch;
+};
+typedef struct Request_t* Request;
+
+
 
 /**
 * listCreate: Allocates a new empty generic list.
@@ -81,7 +91,7 @@ void listDestroy(List list);
 * 	an element failed)
 * 	LIST_SUCCESS if the element had been inserted successfully
 */
-ListResult listAdd(List list, int data);
+ListResult listAdd(List list, int fd, double arrival);
 
 /**
 *	listEnque: add a node with the specified data to the list, a copy of the data will be added
@@ -94,7 +104,7 @@ ListResult listAdd(List list, int data);
 * 	an element failed)
 * 	LIST_SUCCESS if the element had been inserted successfully
 */
-ListResult listEnqueue(List list, int data);
+ListResult listEnqueue(List list, int fd, double arrival);
 
 
 
@@ -123,7 +133,7 @@ ListResult listRemove(List list, int to_remove);
 *   The list from which to remove the node.
 * @return the data of the node
 */
-int listDequeue(List list);
+Request listDequeue(List list);
 
 
 
@@ -139,15 +149,7 @@ int listDequeue(List list);
 */
 ListResult listClear(List list);
 
-/**
-* listCopy: Creates a copy of target list.
-*   copies the data in each node using the copyPtr function specified upon creation of the list.
-* @param list - Target list.
-* @return
-*   NULL if a NULL sent as argument or an allocation failed
-* 	A list containing the same elements as list otherwise.
-*/
-List listCopy(List list);
+
 
 /**
 * listGetSize: Returens the number of nodes in a list.
@@ -169,6 +171,10 @@ int listGetSize(List list);
 */
 int listGet(Node node);
 
+int listDrop(List list, double percent);
+
+
+double Time_GetMilliSeconds();
 
 
 #endif
